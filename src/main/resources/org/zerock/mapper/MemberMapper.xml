@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper 
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.zerock.mapper.MemberMapper">
+
+	<resultMap type="org.zerock.domain.MemberVO" id="memberMap">
+		<id property="userid" column="userid"/>
+		<result property="userpw" column="userpw"/>
+		<result property="userName" column="userName"/>
+		<result property="regDate" column="regDate"/>
+		<result property="updateDate" column="updateDate"/>
+		<collection property="authList" resultMap="authMap">
+		</collection>		
+	</resultMap>
+	
+	<resultMap type="org.zerock.domain.AuthVO" id="authMap">
+		<result property="userid" column="userid"/>
+		<result property="auth" column="auth"/>
+	</resultMap>
+	
+	<select id="read" resultMap="memberMap">
+	SELECT mem.userid, userpw, userName, enabled, regDate, updateDate, auth
+	FROM
+	tbl_member mem LEFT OUTER JOIN tbl_member_auth auth on mem.userid = auth.userid
+	WHERE mem.userid = #{userid}
+	</select>
+	
+	<sql id="criteria">
+		<trim prefix="(" suffix=") AND " prefixOverrides="OR">
+			<foreach item="type" collection="typeArr">
+				<trim prefix="OR">
+					<choose>
+						<when test="type=='T'.toString()">
+		            	(title like '%'||#{keyword}||'%')
+		            	</when>
+						<when test="type=='C'.toString()">
+		            	(content like '%'||#{keyword}||'%')
+		            	</when>
+						<when test="type=='W'.toString()">
+		            	(writer like '%'||#{keyword}||'%')
+		            	</when>
+					</choose>
+				</trim>
+			</foreach>
+		</trim>
+	</sql>
+	
+	<select id="getListWithPaging" resultType="org.zerock.domain.MemberVO">
+	SELECT userid, userpw, userName, enabled, regDate, updateDate, auth
+	FROM (
+	    SELECT rownum rn, a.* FROM
+	    (SELECT 
+	    mem.userid, userpw, userName, enabled, regDate, updateDate, auth
+	    FROM
+	    tbl_member mem LEFT OUTER JOIN tbl_member_auth auth on mem.userid = auth.userid
+	    ORDER BY mem.regDate DESC
+	    ) a
+	    where
+		<include refid="criteria"></include>
+	<![CDATA[   		
+		rownum <= #{pageNum} * #{amount}
+	) 
+	WHERE rn > (#{pageNum} - 1) * #{amount}
+	]]>
+	</select>
+	
+	<!-- insert만 처리되고 생성된 PK값을 알 필요가 없는 경우 -->
+	<insert id="insert">
+		insert into tbl_member(bno, title, content, writer, ip)
+		values (seq_member.nextval, #{title}, #{content}, #{writer}, #{ip})
+	</insert>
+	<!-- insert만 처리되고 생성된 PK값을 알아야 하는 경우 -->
+	<insert id="insertSelectKey">
+		insert into tbl_member(userid, userpw, userName)
+		values (#{userid}, #{userpw}, #{userName})
+	</insert>
+	<insert id="insertAuth">
+		insert into tbl_member_auth(userid, auth)
+		values (#{userid}, #{auth})
+	</insert>
+	
+	<delete id="delete">
+	delete from tbl_member where bno = #{bno}
+	</delete>
+	
+	<update id="update">
+	update tbl_member set title= #{title},
+						content= #{content},
+						writer= #{writer},
+						updatedate= sysdate
+	where bno= #{bno}
+	</update>
+	
+	<select id="getTotalCount" resultType="int">
+	select count(*) from tbl_member
+	where
+	<include refid="criteria"></include>
+	<![CDATA[   
+	1 = 1
+	]]>
+	</select>
+</mapper>
